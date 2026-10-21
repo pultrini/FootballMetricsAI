@@ -166,6 +166,17 @@ def test_unknown_shot_outcome_is_not_invented() -> None:
     assert player.xg is None
 
 
+def test_referees_are_not_reported_as_players() -> None:
+    result = MatchStatisticsCalculator().calculate(
+        positions=[
+            position(0, 9, TeamId.TEAM_A, 10.0, 10.0),
+            position(0, 99, TeamId.REFEREE, 52.5, 34.0),
+        ]
+    )
+
+    assert [player.player_id for player in result.players] == [9]
+
+
 def test_conflicting_player_teams_are_rejected() -> None:
     with pytest.raises(ValueError, match="conflicting teams"):
         MatchStatisticsCalculator().calculate(

@@ -92,6 +92,21 @@ def test_predicted_ball_uses_distinct_color() -> None:
     assert tuple(image[y, x]) == config.predicted_ball_color
 
 
+def test_minimap_draws_recent_ball_trajectory() -> None:
+    pitch_renderer = PitchRenderer(PitchCanvasConfig(pixels_per_metre=4.0, padding=10))
+    config = MinimapConfig(show_track_ids=False)
+    renderer = MinimapRenderer(pitch_renderer, config)
+    trail = [
+        BallPosition(frame_id=3, timestamp=0.6, x=10.0, y=34.0, confidence=0.8),
+        BallPosition(frame_id=4, timestamp=0.8, x=20.0, y=34.0, confidence=0.8),
+    ]
+
+    image = renderer.render([], trail[-1], trail)
+    midpoint = pitch_renderer.metric_to_pixel((15.0, 34.0))
+
+    assert tuple(image[midpoint[1], midpoint[0]]) == config.ball_trail_color
+
+
 def test_minimap_rejects_mixed_frames() -> None:
     renderer = MinimapRenderer()
 

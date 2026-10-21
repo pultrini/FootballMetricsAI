@@ -106,6 +106,26 @@ class PlayerPosition(Record):
     speed: NonNegativeFloat | None = None
 
 
+class IdentityResolutionSummary(Record):
+    """Auditable summary of raw tracker IDs reconciled to player identities."""
+
+    raw_track_count: NonNegativeInt
+    canonical_track_count: NonNegativeInt
+    merged_tracklet_count: NonNegativeInt
+    raw_to_canonical: dict[NonNegativeInt, NonNegativeInt]
+
+    @model_validator(mode="after")
+    def validate_counts(self) -> IdentityResolutionSummary:
+        """Keep the aggregate counts consistent with the full ID mapping."""
+        if self.raw_track_count != len(self.raw_to_canonical):
+            raise ValueError("raw_track_count must equal the number of raw ID mappings")
+        if self.canonical_track_count != len(set(self.raw_to_canonical.values())):
+            raise ValueError("canonical_track_count must equal the number of mapped identities")
+        if self.merged_tracklet_count != self.raw_track_count - self.canonical_track_count:
+            raise ValueError("merged_tracklet_count must equal raw tracks minus canonical tracks")
+        return self
+
+
 class BallPosition(Record):
     """A trusted ball position transformed to pitch coordinates."""
 

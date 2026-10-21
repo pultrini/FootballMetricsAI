@@ -26,6 +26,7 @@ from football_analytics.storage import (
     Detection,
     EventRecord,
     ExpectedGoalPrediction,
+    IdentityResolutionSummary,
     MatchDataExporter,
     MatchStatistics,
     PassEvent,
@@ -37,7 +38,7 @@ from football_analytics.storage import (
     Track,
 )
 from football_analytics.teams import TeamClassifier
-from football_analytics.tracking import Tracker
+from football_analytics.tracking import MetricIdentityResolver, Tracker
 from football_analytics.visualization import (
     AveragePositionRenderer,
     HeatmapRenderer,
@@ -80,6 +81,7 @@ class AnalysisResult:
     events: tuple[EventRecord, ...]
     statistics: MatchStatistics
     team_assignments: Mapping[int, TeamId]
+    identity_resolution: IdentityResolutionSummary
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,6 +106,7 @@ class VideoAnalysisPipeline:
         team_classifier: TeamClassifier,
         xg_model: ExpectedGoalsModel | None = None,
         homography: PitchHomography | None = None,
+        identity_resolver: MetricIdentityResolver | None = None,
         ball_tracker: BallTracker | None = None,
         possession_estimator: BallPossessionEstimator | None = None,
         pass_detector: PassDetector | None = None,
@@ -124,6 +127,7 @@ class VideoAnalysisPipeline:
             PitchHomographyConfig(minimum_confidence=self.config.minimum_homography_confidence)
         )
         self.position_estimator = MetricPositionEstimator(self.homography)
+        self.identity_resolver = identity_resolver or MetricIdentityResolver()
         self.ball_tracker = ball_tracker or BallTracker()
         self.possession_estimator = possession_estimator or BallPossessionEstimator()
         self.pass_detector = pass_detector or PassDetector()
@@ -137,7 +141,9 @@ class VideoAnalysisPipeline:
         self.team_classifier.reset()
         self.homography.clear()
         self.position_estimator.reset()
+        self.identity_resolver.reset()
         self.ball_tracker.reset()
+        self.video_renderer.reset()
         self.possession_estimator.reset()
         self.pass_detector.reset()
         self.shot_detector.reset()
@@ -153,6 +159,7 @@ class VideoAnalysisPipeline:
         """Process an iterable of decoded frames; useful for video I/O and tests."""
         if fps <= 0:
             raise ValueError("fps must be positive")
+        self.possession_estimator.configure_for_fps(fps)
         if maximum_frames is not None and maximum_frames < 1:
             raise ValueError("maximum_frames must be positive")
         self.reset()
@@ -181,10 +188,15 @@ class VideoAnalysisPipeline:
             assignments = self.team_classifier.classify(frame, frame_tracks)
             frame_keypoints = self.keypoint_detector.detect(frame, frame_id=frame_id)
             self._update_homography(frame_keypoints)
-            frame_positions = self.position_estimator.project_tracks(
+            projected_positions = self.position_estimator.project_tracks(
                 frame_tracks,
                 timestamp=timestamp,
                 team_assignments=assignments,
+            )
+            frame_positions = self.identity_resolver.update(
+                projected_positions,
+                frame_id=frame_id,
+                timestamp=timestamp,
             )
             if self.homography.validate():
                 ball_candidates = self.position_estimator.project_balls(
@@ -225,14 +237,20 @@ class VideoAnalysisPipeline:
             frame_count += 1
 
             if annotated_frame_callback is not None:
+                ball_pixel_position = (
+                    None
+                    if ball is None or not self.homography.validate()
+                    else self.homography.inverse_transform_point((ball.x, ball.y))
+                )
                 annotated_frame_callback(
                     self.video_renderer.render(
                         frame,
-                        frame_tracks,
+                        self.identity_resolver.relabel_tracks(frame_tracks),
                         frame_positions,
                         ball,
                         possession,
-                        assignments,
+                        self.identity_resolver.resolve_team_assignments(assignments),
+                        ball_pixel_position,
                     )
                 )
             if frame_count % 100 == 0:
@@ -240,7 +258,9 @@ class VideoAnalysisPipeline:
 
         if frame_count == 0:
             raise VideoAnalysisError("Video contains no decodable frames")
-        final_assignments = dict(self.team_classifier.assignments)
+        final_assignments = self.identity_resolver.resolve_team_assignments(
+            self.team_classifier.assignments
+        )
         enriched_positions = tuple(
             self._enrich_position(item, final_assignments) for item in positions
         )
@@ -270,6 +290,7 @@ class VideoAnalysisPipeline:
             events=events,
             statistics=statistics,
             team_assignments=final_assignments,
+            identity_resolution=self.identity_resolver.summary(),
         )
 
     def analyze_video(
@@ -387,6 +408,7 @@ class VideoAnalysisPipeline:
                         str(player_id): team.value
                         for player_id, team in result.team_assignments.items()
                     },
+                    "identity_resolution": result.identity_resolution.model_dump(mode="json"),
                     "statistics": result.statistics.model_dump(mode="json"),
                 },
                 indent=2,

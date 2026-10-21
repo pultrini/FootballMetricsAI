@@ -91,6 +91,35 @@ def test_short_possession_flicker_is_not_a_pass() -> None:
     assert detector.update(frame(1, 0.1, 20, TeamId.TEAM_A, 20.5)) == []
 
 
+def test_identity_switch_without_ball_departure_is_not_a_pass() -> None:
+    detector = PassDetector(PassDetectorConfig(minimum_departure_distance_m=1.0))
+    detector.update(frame(0, 0.0, 10, TeamId.TEAM_A, 20.0))
+
+    assert detector.update(frame(1, 0.2, 20, TeamId.TEAM_A, 20.4)) == []
+
+
+def test_direct_low_fps_transition_is_valid_when_ball_travelled() -> None:
+    detector = PassDetector(PassDetectorConfig(minimum_departure_distance_m=1.0))
+    detector.update(frame(0, 0.0, 10, TeamId.TEAM_A, 20.0))
+
+    events = detector.update(frame(1, 0.2, 20, TeamId.TEAM_A, 24.0))
+
+    assert len(events) == 1
+    assert events[0].passer_id == 10
+    assert events[0].receiver_id == 20
+    assert events[0].completed
+
+
+def test_new_controller_cannot_reuse_previous_players_ball_origin() -> None:
+    detector = PassDetector()
+    detector.update(frame(0, 0.0, 10, TeamId.TEAM_A, 20.0))
+    detector.update(frame(1, 0.2, 20, TeamId.TEAM_A, 24.0, confidence=0.0))
+
+    events = detector.update(frame(2, 0.4, 30, TeamId.TEAM_A, 30.0))
+
+    assert events == []
+
+
 def test_unknown_receiver_team_does_not_invent_incomplete_pass() -> None:
     detector = PassDetector()
     detector.update(frame(0, 0.0, 10, TeamId.TEAM_A, 20.0))

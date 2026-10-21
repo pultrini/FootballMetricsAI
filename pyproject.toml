@@ -18,6 +18,7 @@ dependencies = [
     "polars>=1.44.1",
     "pydantic>=2.13.5",
     "scikit-learn>=1.9.0",
+    "scipy>=1.18.1",
     "supervision>=0.30.2",
     "torch>=2.14.0",
     "trackers>=2.6.0",
@@ -40,6 +41,7 @@ datasets = [
 dev = [
     "pytest>=9.1.1",
     "ruff>=0.16.6",
+    "taskipy>=1.14.1",
 ]
 
 [tool.pytest.ini_options]
@@ -49,6 +51,7 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+exclude=["*.ipynb"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
@@ -60,3 +63,10 @@ docstring-code-format = true
 members = [
     "baixar_model",
 ]
+
+[tool.taskipy.tasks]
+format = "uv run ruff format ."
+lint = "uv run ruff check . --fix"
+test = "uv run pytest -v"
+
+check = "task format && task lint && task test"

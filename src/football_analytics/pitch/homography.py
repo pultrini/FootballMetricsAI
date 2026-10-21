@@ -173,6 +173,17 @@ class PitchHomography:
         """Transform one pixel point into pitch metres when the estimate is reliable."""
         return self.transform_points([point])[0]
 
+    def inverse_transform_point(self, point: Point) -> Point:
+        """Transform one metric pitch point back into the current video frame."""
+        if not self.validate() or self._matrix is None:
+            raise UnreliableHomographyError(
+                "Homography is missing or below the configured reliability threshold"
+            )
+        inverse = np.linalg.inv(self._matrix)
+        projected = self._project(self._point_array([point], "points"), inverse)
+        x, y = projected[0]
+        return (float(x), float(y))
+
     def transform_points(self, points: Sequence[Point] | npt.NDArray[np.number]) -> list[Point]:
         """Transform pixel points into pitch metres when the estimate is reliable."""
         if not self.validate() or self._matrix is None:

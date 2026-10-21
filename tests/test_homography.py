@@ -24,6 +24,7 @@ def test_homography_transforms_pixel_coordinates_to_metres() -> None:
     assert homography.confidence == pytest.approx(0.95)
     assert homography.reprojection_rmse == pytest.approx(0.0, abs=1e-8)
     assert homography.transform_point((500.0, 300.0)) == pytest.approx((52.5, 34.0))
+    assert homography.inverse_transform_point((52.5, 34.0)) == pytest.approx((500.0, 300.0))
 
 
 def test_homography_ransac_rejects_an_outlier() -> None:

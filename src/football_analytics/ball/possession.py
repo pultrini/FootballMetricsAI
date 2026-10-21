@@ -21,11 +21,13 @@ class PossessionConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    acquisition_distance_m: float = Field(default=2.0, gt=0)
-    release_distance_m: float = Field(default=3.0, gt=0)
+    acquisition_distance_m: float = Field(default=4.0, gt=0)
+    release_distance_m: float = Field(default=4.0, gt=0)
     acquisition_frames: int = Field(default=2, ge=1)
     switch_frames: int = Field(default=2, ge=1)
     release_frames: int = Field(default=3, ge=1)
+    reference_fps: float = Field(default=25.0, gt=0)
+    adapt_temporal_windows_to_fps: bool = True
     minimum_ball_confidence: float = Field(default=0.2, ge=0, le=1)
 
     @model_validator(mode="after")
@@ -41,7 +43,21 @@ class BallPossessionEstimator:
 
     def __init__(self, config: PossessionConfig | None = None) -> None:
         self.config = config or PossessionConfig()
+        self._acquisition_frames = self.config.acquisition_frames
+        self._switch_frames = self.config.switch_frames
+        self._release_frame_limit = self.config.release_frames
         self.reset()
+
+    def configure_for_fps(self, fps: float) -> None:
+        """Keep possession confirmation windows approximately constant in time."""
+        if fps <= 0:
+            raise ValueError("fps must be positive")
+        if not self.config.adapt_temporal_windows_to_fps:
+            return
+        scale = fps / self.config.reference_fps
+        self._acquisition_frames = max(1, round(self.config.acquisition_frames * scale))
+        self._switch_frames = max(1, round(self.config.switch_frames * scale))
+        self._release_frame_limit = max(1, round(self.config.release_frames * scale))
 
     @property
     def current_player_id(self) -> int | None:
@@ -124,9 +140,7 @@ class BallPossessionEstimator:
 
         if candidate is not None:
             required_frames = (
-                self.config.acquisition_frames
-                if self._current_player_id is None
-                else self.config.switch_frames
+                self._acquisition_frames if self._current_player_id is None else self._switch_frames
             )
             self._consider_candidate(candidate, required_frames)
             self._release_frames = 0
@@ -172,7 +186,7 @@ class BallPossessionEstimator:
         if self._current_player_id is None:
             return
         self._release_frames += 1
-        if self._release_frames >= self.config.release_frames:
+        if self._release_frames >= self._release_frame_limit:
             self._current_player_id = None
             self._current_team_id = None
             self._release_frames = 0

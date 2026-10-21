@@ -1,0 +1,36 @@
+name: CI
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+jobs:
+    quality:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Baixar o código
+              uses: actions/checkout@v5
+
+            - name: Configurar uv e Python
+              uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
+              with:
+                python-version: "3.12"
+                enable-cache: true
+            
+            - name: Instalar dependencias
+              run: uv sync --group dev --locked
+            
+            - name: Verificar formatações
+              run: uv run ruff format --check
+            
+            - name: Verificar o lint
+              run: uv run ruff check .
+
+            - name: Executar testes
+              run: uv run pytest -v

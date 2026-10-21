@@ -56,7 +56,13 @@ class MatchStatisticsCalculator:
     ) -> MatchStatistics:
         """Return serializable statistics for all observed players and both teams."""
         teams_by_player = self._resolve_player_teams(positions, possessions, passes, shots)
-        positions_by_player = self._group_positions(positions)
+        positions_by_player = self._group_positions(
+            [
+                position
+                for position in positions
+                if position.team_id is None or TeamId(position.team_id) is not TeamId.REFEREE
+            ]
+        )
         possession_seconds, team_seconds, spatial_possession = self._possession_data(
             possessions, positions
         )

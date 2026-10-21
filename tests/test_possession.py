@@ -53,6 +53,38 @@ def test_possession_requires_temporal_confirmation() -> None:
     assert second.team_id == TeamId.TEAM_A
 
 
+def test_temporal_confirmation_scales_down_for_low_fps_video() -> None:
+    estimator = BallPossessionEstimator(
+        PossessionConfig(acquisition_frames=2, switch_frames=2, release_frames=3)
+    )
+    estimator.configure_for_fps(5.0)
+
+    acquired = estimator.update(
+        [player(0, 10, TeamId.TEAM_A, 20.0, 20.0, 0.0)],
+        ball(0, 0.0, 20.5, 20.0),
+        frame_id=0,
+        timestamp=0.0,
+    )
+
+    assert acquired.player_id == 10
+
+
+def test_fps_adaptation_can_be_disabled() -> None:
+    estimator = BallPossessionEstimator(
+        PossessionConfig(acquisition_frames=2, adapt_temporal_windows_to_fps=False)
+    )
+    estimator.configure_for_fps(5.0)
+
+    pending = estimator.update(
+        [player(0, 10, TeamId.TEAM_A, 20.0, 20.0, 0.0)],
+        ball(0, 0.0, 20.5, 20.0),
+        frame_id=0,
+        timestamp=0.0,
+    )
+
+    assert pending.player_id is None
+
+
 def test_release_hysteresis_prevents_one_frame_flicker() -> None:
     estimator = BallPossessionEstimator(PossessionConfig(acquisition_frames=1, release_frames=2))
     estimator.update(

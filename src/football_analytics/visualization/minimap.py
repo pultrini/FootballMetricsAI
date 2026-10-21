@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from itertools import pairwise
 
 import cv2
 import numpy as np
@@ -30,6 +31,9 @@ class MinimapConfig(BaseModel):
     unassigned_color: Color = (180, 180, 180)
     ball_color: Color = (255, 255, 255)
     predicted_ball_color: Color = (130, 130, 130)
+    ball_trail_color: Color = (0, 230, 255)
+    predicted_ball_trail_color: Color = (100, 100, 100)
+    ball_trail_thickness: int = Field(default=2, ge=1)
 
 
 class MinimapRenderer:
@@ -47,6 +51,7 @@ class MinimapRenderer:
         self,
         players: Sequence[PlayerPosition],
         ball: BallPosition | None = None,
+        ball_trail: Sequence[BallPosition] = (),
     ) -> Frame:
         """Render all observations belonging to one frame."""
         frame_ids = {player.frame_id for player in players}
@@ -56,6 +61,7 @@ class MinimapRenderer:
             raise ValueError("Minimap observations must belong to exactly one frame")
 
         canvas = self.pitch_renderer.render()
+        self._draw_ball_trail(canvas, ball_trail)
         for player in players:
             center = self.pitch_renderer.metric_to_pixel((player.x, player.y))
             color = self._player_color(player.team_id)
@@ -94,6 +100,23 @@ class MinimapRenderer:
             )
             cv2.circle(canvas, center, 3, ball_color, -1, cv2.LINE_AA)
         return canvas
+
+    def _draw_ball_trail(self, canvas: Frame, trail: Sequence[BallPosition]) -> None:
+        """Draw recent tracked ball positions, splitting observed and predicted segments."""
+        for previous, current in pairwise(trail):
+            color = (
+                self.config.ball_trail_color
+                if previous.observed and current.observed
+                else self.config.predicted_ball_trail_color
+            )
+            cv2.line(
+                canvas,
+                self.pitch_renderer.metric_to_pixel((previous.x, previous.y)),
+                self.pitch_renderer.metric_to_pixel((current.x, current.y)),
+                color,
+                self.config.ball_trail_thickness,
+                cv2.LINE_AA,
+            )
 
     def overlay(self, frame: Frame, minimap: Frame) -> Frame:
         """Return a copy of a frame with a scaled minimap in its top-right corner."""

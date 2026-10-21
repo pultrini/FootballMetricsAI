@@ -95,8 +95,19 @@ test suite. ByteTrack should receive person-like classes; ball observations are 
 dedicated metric-space ball tracker. Unconfirmed internal ByteTrack observations are omitted
 until the backend assigns a non-negative persistent ID.
 
+After homography projection, `MetricIdentityResolver` reconnects short ByteTrack fragments in
+pitch coordinates. It predicts each recently lost identity from its last position and velocity,
+rejects incompatible teams, gates physically implausible distances, and uses a one-to-one global
+assignment. Raw ByteTrack IDs remain in `tracks` exports for auditing; metric positions, possession,
+passes, shots, minimaps, and statistics use the canonical IDs.
+
+Every `report.json` also includes `identity_resolution`: the number of projected raw IDs,
+the number of canonical identities, the number of merged tracklets, and the full
+`raw_to_canonical` mapping. Use it to compare tracker configurations on the same video;
+it reports only identities with valid metric projection, not every raw ByteTrack observation.
+
 Runtime dependencies are managed by `uv`: Pydantic, NumPy, Polars, scikit-learn, joblib,
-OpenCV, Ultralytics, Supervision, and Roboflow Trackers. PyTorch is resolved transitively by
+SciPy, OpenCV, Ultralytics, Supervision, and Roboflow Trackers. PyTorch is resolved transitively by
 Ultralytics. pytest and Ruff remain development dependencies.
 
 ## Pitch keypoints and homography
@@ -172,7 +183,9 @@ change. Predictions outside the pitch or beyond the configured gap are discarded
 
 BallPossessionEstimator uses player-to-ball distance with separate acquisition and release
 thresholds. Acquisition, player switches, and loss of possession require configurable repeated
-evidence. This hysteresis prevents frame-by-frame flicker when players contest the ball.
+evidence. This hysteresis prevents frame-by-frame flicker when players contest the ball. The
+video pipeline scales these frame windows from the 25 FPS reference so that a 5 FPS input does
+not require five times as much real time to confirm the same action.
 
 ~~~python
 from football_analytics.ball import BallPossessionEstimator, BallTracker
@@ -205,10 +218,12 @@ affiliation is available.
 ## Passes and shots
 
 EventFrame guarantees that possession and ball evidence belong to the same frame and timestamp.
-PassDetector opens a candidate when confirmed possession leaves a player. Reception by a
-teammate completes the pass; reception by a known opponent or expiration makes it incomplete.
-An unknown receiver team does not create an invented interception, and short possession flicker
-below the configured distance or duration is ignored.
+PassDetector validates the ordered sequence control, departure/travel, and reception. Reception
+by a teammate completes the pass; reception by a known opponent or expiration makes it
+incomplete. A player-ID or nearest-player change without measurable ball travel is rejected.
+Direct transitions can still form a pass in low-FPS video when the ball travelled far enough
+between samples. An unknown receiver team does not create an invented interception, and short
+sequences below the configured distance or duration are ignored.
 
 ShotDetector is independent from xG. It requires prior possession, ball acceleration, minimum
 speed, separation from the controlled origin, and a velocity vector pointing toward the

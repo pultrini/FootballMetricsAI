@@ -1,3 +1,4 @@
+import json
 from collections.abc import Mapping, Sequence
 
 import cv2
@@ -54,6 +55,19 @@ class FakeTracker(Tracker):
 
     def reset(self) -> None:
         pass
+
+
+class FragmentingTracker(FakeTracker):
+    def update(
+        self,
+        detections: Sequence[Detection],
+        *,
+        frame_id: int,
+        frame: Frame | None = None,
+    ) -> list[Track]:
+        tracks = super().update(detections, frame_id=frame_id, frame=frame)
+        raw_id = 9 if frame_id == 0 else 99
+        return [Track.model_validate({**tracks[0].model_dump(), "track_id": raw_id})]
 
 
 class FakeKeypointDetector(PitchKeypointDetector):
@@ -125,6 +139,7 @@ def test_pipeline_connects_every_stage_and_writes_outputs(tmp_path) -> None:
     assert len(result.pitch_keypoints) == 12
     assert len(result.ball_positions) == len(result.possessions) == 3
     assert result.team_assignments == {9: TeamId.TEAM_A}
+    assert result.identity_resolution.merged_tracklet_count == 0
     assert all(item.team_id == TeamId.TEAM_A for item in result.positions)
     assert len(annotated) == 3
     assert annotated[0].shape == frames(1)[0].shape
@@ -133,6 +148,8 @@ def test_pipeline_connects_every_stage_and_writes_outputs(tmp_path) -> None:
     assert manifest.tables["team_stats"]["json"].is_file()
     assert manifest.visualizations["shot_map"].is_file()
     assert manifest.visualizations["player_9_heatmap"].is_file()
+    report = json.loads(manifest.report.read_text())
+    assert report["identity_resolution"]["raw_to_canonical"] == {"9": 9}
 
 
 def test_pipeline_honours_maximum_frames() -> None:
@@ -140,6 +157,27 @@ def test_pipeline_honours_maximum_frames() -> None:
 
     assert result.frame_count == 2
     assert {item.frame_id for item in result.detections} == {0, 1}
+
+
+def test_pipeline_uses_canonical_identity_after_raw_track_fragmentation() -> None:
+    analyzer = VideoAnalysisPipeline(
+        detector=FakeDetector(),
+        tracker=FragmentingTracker(),
+        keypoint_detector=FakeKeypointDetector(),
+        team_classifier=FakeTeamClassifier(),
+    )
+
+    result = analyzer.process_frames(frames(3), fps=2.0)
+
+    assert {item.track_id for item in result.positions} == {9}
+    assert {item.track_id for item in result.tracks} == {9, 99}
+    assert result.team_assignments == {9: TeamId.TEAM_A}
+    assert result.identity_resolution.model_dump() == {
+        "raw_track_count": 2,
+        "canonical_track_count": 1,
+        "merged_tracklet_count": 1,
+        "raw_to_canonical": {9: 9, 99: 9},
+    }
 
 
 def test_pipeline_uses_video_calibrated_homography_confidence() -> None:
