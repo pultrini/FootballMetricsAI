@@ -60,8 +60,8 @@ from football_analytics.detection import YoloDetector, YoloDetectorConfig
 from football_analytics.tracking import ByteTrackTracker
 
 detector = YoloDetector(
-"models/football.pt",
-YoloDetectorConfig(allowed_classes=frozenset({"player", "goalkeeper", "referee", "ball"})),
+    "models/football.pt",
+    YoloDetectorConfig(allowed_classes=frozenset({"player", "goalkeeper", "referee", "ball"})),
 )
 tracker = ByteTrackTracker()
 
@@ -128,9 +128,9 @@ minimap_renderer = MinimapRenderer()
 
 timestamp = frame_id / frames_per_second
 positions = position_estimator.project_tracks(
-tracks,
-timestamp=timestamp,
-team_assignments=team_assignments,
+    tracks,
+    timestamp=timestamp,
+    team_assignments=team_assignments,
 )
 ball_position = position_estimator.project_ball(ball_detection, timestamp=timestamp)
 minimap = minimap_renderer.render(positions, ball_position)
@@ -152,19 +152,19 @@ ball_tracker = BallTracker()
 possession_estimator = BallPossessionEstimator()
 
 ball_candidates = position_estimator.project_balls(
-ball_detections,
-timestamp=timestamp,
+    ball_detections,
+    timestamp=timestamp,
 )
 tracked_ball = ball_tracker.update(
-ball_candidates,
-frame_id=frame_id,
-timestamp=timestamp,
+    ball_candidates,
+    frame_id=frame_id,
+    timestamp=timestamp,
 )
 possession = possession_estimator.update(
-positions,
-tracked_ball,
-frame_id=frame_id,
-timestamp=timestamp,
+    positions,
+    tracked_ball,
+    frame_id=frame_id,
+    timestamp=timestamp,
 )
 ~~~
 
@@ -229,11 +229,11 @@ O `MatchStatisticsCalculator` combina posições de métricas confiáveis, obser
 from football_analytics.analytics import MatchStatisticsCalculator
 
 statistics = MatchStatisticsCalculator().calculate(
-positions=positions,
-possessions=possession_observations,
-passes=passes,
-shots=shots,
-xg_predictions=xg_predictions,
+    positions=positions,
+    possessions=possession_observations,
+    passes=passes,
+    shots=shots,
+    xg_predictions=xg_predictions,
 )
 ```
 
@@ -247,9 +247,9 @@ As visualizações operam diretamente sobre coordenadas métricas canônicas e r
 import cv2
 
 from football_analytics.visualization import (
-AveragePositionRenderer,
-HeatmapRenderer,
-ShotMapRenderer,
+    AveragePositionRenderer,
+    HeatmapRenderer,
+    ShotMapRenderer,
 )
 
 player_heatmap = HeatmapRenderer().render_positions(positions, player_id=9)
