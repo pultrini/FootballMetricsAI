@@ -1,0 +1,63 @@
+{
+  "additionalProperties": false,
+  "description": "Public event envelope emitted by incremental workers.",
+  "properties": {
+    "data": {
+      "additionalProperties": true,
+      "title": "Data",
+      "type": "object"
+    },
+    "event_id": {
+      "format": "uuid",
+      "title": "Event Id",
+      "type": "string"
+    },
+    "job_id": {
+      "format": "uuid",
+      "title": "Job Id",
+      "type": "string"
+    },
+    "occurred_at": {
+      "format": "date-time",
+      "title": "Occurred At",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1",
+      "default": "1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "segment_index": {
+      "minimum": 0,
+      "title": "Segment Index",
+      "type": "integer"
+    },
+    "stream_id": {
+      "format": "uuid",
+      "title": "Stream Id",
+      "type": "string"
+    },
+    "type": {
+      "enum": [
+        "analysis.started",
+        "analysis.progress",
+        "analysis.segment_completed",
+        "analysis.completed",
+        "analysis.failed"
+      ],
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "event_id",
+    "stream_id",
+    "job_id",
+    "segment_index",
+    "type",
+    "occurred_at"
+  ],
+  "title": "AnalysisEvent",
+  "type": "object"
+}

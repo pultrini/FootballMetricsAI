@@ -1,0 +1,45 @@
+{
+  "additionalProperties": false,
+  "description": "Queue message identifying an ordered segment to process.",
+  "properties": {
+    "job_id": {
+      "format": "uuid",
+      "title": "Job Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1",
+      "default": "1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "segment_index": {
+      "minimum": 0,
+      "title": "Segment Index",
+      "type": "integer"
+    },
+    "source": {
+      "title": "Source",
+      "type": "string"
+    },
+    "source_offset_seconds": {
+      "minimum": 0,
+      "title": "Source Offset Seconds",
+      "type": "number"
+    },
+    "stream_id": {
+      "format": "uuid",
+      "title": "Stream Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "stream_id",
+    "job_id",
+    "segment_index",
+    "source",
+    "source_offset_seconds"
+  ],
+  "title": "JobRequest",
+  "type": "object"
+}
