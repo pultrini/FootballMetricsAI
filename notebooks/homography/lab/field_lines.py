@@ -142,9 +142,10 @@ def intersections(
                 np.hypot(x - other.x1, y - other.y1),
                 np.hypot(x - other.x2, y - other.y2),
             )
-            if min(distances[0], distances[1]) <= max_distance and min(
-                distances[2], distances[3]
-            ) <= max_distance:
+            if (
+                min(distances[0], distances[1]) <= max_distance
+                and min(distances[2], distances[3]) <= max_distance
+            ):
                 points.append((x, y))
     if not points:
         return np.empty((0, 2), dtype=float)
