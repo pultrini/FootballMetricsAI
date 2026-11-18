@@ -39,6 +39,8 @@ datasets = [
     "statsbombpy>=1.22.0",
 ]
 dev = [
+    "import-linter>=2.15",
+    "import-linter>=2.15.0",
     "pytest>=9.1.1",
     "ruff>=0.16.6",
     "taskipy>=1.14.1",
@@ -47,6 +49,9 @@ dev = [
 [tool.pytest.ini_options]
 addopts = "-ra"
 testpaths = ["tests"]
+markers = [
+    "slow: tests that require external video and model artifacts",
+]
 
 [tool.ruff]
 line-length = 100
@@ -59,6 +64,28 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 [tool.ruff.format]
 docstring-code-format = true
 
+[tool.importlinter]
+root_package = "football_analytics"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "domain não depende de application nem adapters"
+type = "forbidden"
+source_modules = ["football_analytics.domain"]
+forbidden_modules = ["football_analytics.application", "football_analytics.adapters"]
+
+[[tool.importlinter.contracts]]
+name = "application não depende de adapters"
+type = "forbidden"
+source_modules = ["football_analytics.application"]
+forbidden_modules = ["football_analytics.adapters"]
+
+[[tool.importlinter.contracts]]
+name = "domain não importa bibliotecas de infraestrutura"
+type = "forbidden"
+source_modules = ["football_analytics.domain"]
+forbidden_modules = ["ultralytics", "cv2", "supervision", "trackers", "onnxruntime"]
+
 [tool.uv.workspace]
 members = [
     "baixar_model",
@@ -68,5 +95,6 @@ members = [
 format = "uv run ruff format ."
 lint = "uv run ruff check . --fix"
 test = "uv run pytest -v"
+lint-imports = "uv run lint-imports"
 
 check = "task format && task lint && task test"

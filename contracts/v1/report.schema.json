@@ -1,0 +1,48 @@
+{
+  "additionalProperties": true,
+  "description": "Stable top-level report shape matching report.json.",
+  "properties": {
+    "event_count": {
+      "minimum": 0,
+      "title": "Event Count",
+      "type": "integer"
+    },
+    "fps": {
+      "exclusiveMinimum": 0,
+      "title": "Fps",
+      "type": "number"
+    },
+    "frame_count": {
+      "minimum": 0,
+      "title": "Frame Count",
+      "type": "integer"
+    },
+    "identity_resolution": {
+      "additionalProperties": true,
+      "title": "Identity Resolution",
+      "type": "object"
+    },
+    "statistics": {
+      "additionalProperties": true,
+      "title": "Statistics",
+      "type": "object"
+    },
+    "team_assignments": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Team Assignments",
+      "type": "object"
+    }
+  },
+  "required": [
+    "fps",
+    "frame_count",
+    "event_count",
+    "team_assignments",
+    "identity_resolution",
+    "statistics"
+  ],
+  "title": "ReportContract",
+  "type": "object"
+}
