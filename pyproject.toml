@@ -45,6 +45,15 @@ dev = [
     "ruff>=0.16.6",
     "taskipy>=1.14.1",
 ]
+notebooks = [
+    "inference-sdk>=0.12.0",
+    "ipykernel>=7.3.0",
+    "ipympl>=0.10.0",
+    "ipywidgets>=8.1.9",
+    "jupyterlab>=4.6.5",
+    "matplotlib>=3.11.1",
+    "pandas>=3.0.5",
+]
 
 [tool.pytest.ini_options]
 addopts = "-ra"
