@@ -1,11 +1,3 @@
-"""Ball tracking and possession estimation."""
+"""Compatibility exports for domain ball analytics."""
 
-from football_analytics.ball.ball_tracker import BallTracker, BallTrackerConfig
-from football_analytics.ball.possession import BallPossessionEstimator, PossessionConfig
-
-__all__ = [
-    "BallPossessionEstimator",
-    "BallTracker",
-    "BallTrackerConfig",
-    "PossessionConfig",
-]
+from football_analytics.domain.ball import *  # noqa: F403

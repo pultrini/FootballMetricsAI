@@ -1,6 +1,6 @@
 """Jersey-colour based team assignment."""
 
-from football_analytics.teams.team_classifier import (
+from football_analytics.adapters.outbound.team_classifier import (
     JerseyTeamClassifier,
     TeamClassifier,
     TeamClassifierConfig,

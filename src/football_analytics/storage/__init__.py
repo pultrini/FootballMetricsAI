@@ -1,6 +1,17 @@
 """Validated records and persistence boundaries."""
 
-from football_analytics.storage.schemas import (
+from football_analytics.adapters.outbound.parquet_sink import (
+    MatchDataExporter,
+    TabularExporter,
+    TabularExportError,
+    records_to_frame,
+)
+from football_analytics.domain.analytics.shot_dataset import (
+    FEATURE_COLUMNS,
+    ShotDataset,
+    ShotDatasetError,
+)
+from football_analytics.domain.schemas.schemas import (
     BallPosition,
     Detection,
     EventRecord,
@@ -19,17 +30,6 @@ from football_analytics.storage.schemas import (
     TeamStatistics,
     Track,
     XGAggregation,
-)
-from football_analytics.storage.shot_dataset import (
-    FEATURE_COLUMNS,
-    ShotDataset,
-    ShotDatasetError,
-)
-from football_analytics.storage.tabular import (
-    MatchDataExporter,
-    TabularExporter,
-    TabularExportError,
-    records_to_frame,
 )
 
 __all__ = [

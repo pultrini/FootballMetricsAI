@@ -1,19 +1,19 @@
 """Canonical football pitch representation."""
 
-from football_analytics.pitch.homography import (
-    HomographyError,
-    HomographyEstimationError,
-    PitchHomography,
-    PitchHomographyConfig,
-    UnreliableHomographyError,
-)
-from football_analytics.pitch.keypoint_detector import PitchKeypointDetector
-from football_analytics.pitch.keypoints import DEFAULT_PITCH_LANDMARKS, PitchLandmark
-from football_analytics.pitch.pitch_model import DEFAULT_PITCH, GoalSide, Pitch
-from football_analytics.pitch.yolo_keypoint_detector import (
+from football_analytics.adapters.outbound.yolo_pitch_keypoints import (
     YoloPitchKeypointConfig,
     YoloPitchKeypointDetector,
 )
+from football_analytics.application.ports.pitch_keypoints import PitchKeypointDetector
+from football_analytics.domain.pitch.homography import (
+    HomographyError,
+    HomographyEstimationError,
+    PitchHomographyConfig,
+    UnreliableHomographyError,
+)
+from football_analytics.domain.pitch.keypoints import DEFAULT_PITCH_LANDMARKS, PitchLandmark
+from football_analytics.domain.pitch.pitch_model import DEFAULT_PITCH, GoalSide, Pitch
+from football_analytics.pitch.homography import PitchHomography
 
 __all__ = [
     "DEFAULT_PITCH",
