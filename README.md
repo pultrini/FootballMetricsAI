@@ -24,6 +24,27 @@ uv run ruff check .
 uv run football-analytics --help
 ```
 
+## Incremental segments and public contracts
+
+The `AnalysisSession.process_segment()` API preserves tracking, possession, and pending
+event state between ordered segments. Use `final_report()` for additive totals; point-in-time
+metrics remain `null`. Queue integrations should use `QueueWorker` with one session per
+`stream_id`. Messages are ordered by `segment_index`; duplicates are ignored and gaps emit
+an `analysis.failed` event with `SEGMENT_GAP`.
+
+Public event envelopes and requests are versioned in
+[`contracts/v1/`](contracts/v1/). Regenerate them after changing the Pydantic models with:
+
+```bash
+uv run python scripts/export_contracts.py
+```
+
+The CLI supports `--progress jsonl`, emitting `analysis.started`,
+`analysis.progress`, `analysis.completed`, and `analysis.failed`, one JSON object per line.
+Expected CLI exit codes are `1` for unknown failures, `2` for unreadable video, `3` for
+missing models, `4` for invalid configuration, `5` for inference failures, and `6` for
+unavailable homography.
+
 Format the code with:
 
 ```bash
@@ -429,3 +450,7 @@ When a frame lacks a reliable homography, metric positions and ball state are su
 frame. The video pipeline uses a calibrated minimum confidence of 0.40 for the supplied
 32-keypoint model while retaining the RANSAC inlier and reprojection-error gates. This prevents
 stale camera geometry from contaminating match statistics without discarding most valid frames.
+
+
+### Models link
+https://drive.google.com/drive/folders/1gS8b4Fiyk7scZx9gG7W8pyczj_4otOR9?usp=sharing

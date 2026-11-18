@@ -11,23 +11,43 @@ from pathlib import Path
 import cv2
 from pydantic import BaseModel, ConfigDict, Field
 
-from football_analytics.analytics import ExpectedGoalsModel, MatchStatisticsCalculator
-from football_analytics.ball import BallPossessionEstimator, BallTracker
-from football_analytics.detection import Detector, Frame, validate_frame
-from football_analytics.events import EventFrame, PassDetector, ShotDetector
-from football_analytics.pitch import (
+from football_analytics.adapters.outbound.opencv_homography import OpenCvHomographyBackend
+from football_analytics.adapters.outbound.parquet_sink import MatchDataExporter
+from football_analytics.adapters.outbound.team_classifier import TeamClassifier
+from football_analytics.adapters.outbound.visualization import (
+    AveragePositionRenderer,
+    HeatmapRenderer,
+    ShotMapRenderer,
+    VideoRenderer,
+)
+from football_analytics.application.contracts import WindowMetrics
+from football_analytics.application.errors import AnalysisError, AnalysisErrorCode
+from football_analytics.application.ports import (
+    Detector,
+    Frame,
+    PitchKeypointDetector,
+    Tracker,
+    validate_frame,
+)
+from football_analytics.domain.analytics import ExpectedGoalsModel, MatchStatisticsCalculator
+from football_analytics.domain.analytics.identity_resolver import MetricIdentityResolver
+from football_analytics.domain.analytics.positions import (
+    MetricPositionEstimator,
+    PositionEstimatorConfig,
+)
+from football_analytics.domain.ball import BallPossessionEstimator, BallTracker
+from football_analytics.domain.events import EventFrame, PassDetector, ShotDetector
+from football_analytics.domain.pitch import (
     HomographyEstimationError,
     PitchHomography,
     PitchHomographyConfig,
-    PitchKeypointDetector,
 )
-from football_analytics.storage import (
+from football_analytics.domain.schemas import (
     BallPosition,
     Detection,
     EventRecord,
     ExpectedGoalPrediction,
     IdentityResolutionSummary,
-    MatchDataExporter,
     MatchStatistics,
     PassEvent,
     PitchKeypoint,
@@ -37,20 +57,22 @@ from football_analytics.storage import (
     TeamId,
     Track,
 )
-from football_analytics.teams import TeamClassifier
-from football_analytics.tracking import MetricIdentityResolver, Tracker
-from football_analytics.visualization import (
-    AveragePositionRenderer,
-    HeatmapRenderer,
-    ShotMapRenderer,
-    VideoRenderer,
-)
 
 LOGGER = logging.getLogger(__name__)
 
 
-class VideoAnalysisError(RuntimeError):
+class VideoAnalysisError(AnalysisError):
     """Raised when a video cannot be opened, decoded, or written."""
+
+    def __init__(
+        self,
+        message_or_code: str | AnalysisErrorCode,
+        message: str | None = None,
+    ) -> None:
+        if message is None:
+            super().__init__(AnalysisErrorCode.VIDEO_UNREADABLE, str(message_or_code))
+        else:
+            super().__init__(message_or_code, message)
 
 
 class VideoPipelineConfig(BaseModel):
@@ -113,10 +135,9 @@ class VideoAnalysisPipeline:
         shot_detector: ShotDetector | None = None,
         statistics_calculator: MatchStatisticsCalculator | None = None,
         video_renderer: VideoRenderer | None = None,
+        position_config: PositionEstimatorConfig | None = None,
         config: VideoPipelineConfig | None = None,
     ) -> None:
-        from football_analytics.analytics import MetricPositionEstimator
-
         self.detector = detector
         self.tracker = tracker
         self.keypoint_detector = keypoint_detector
@@ -124,9 +145,10 @@ class VideoAnalysisPipeline:
         self.xg_model = xg_model
         self.config = config or VideoPipelineConfig()
         self.homography = homography or PitchHomography(
-            PitchHomographyConfig(minimum_confidence=self.config.minimum_homography_confidence)
+            PitchHomographyConfig(minimum_confidence=self.config.minimum_homography_confidence),
+            backend=OpenCvHomographyBackend(),
         )
-        self.position_estimator = MetricPositionEstimator(self.homography)
+        self.position_estimator = MetricPositionEstimator(self.homography, position_config)
         self.identity_resolver = identity_resolver or MetricIdentityResolver()
         self.ball_tracker = ball_tracker or BallTracker()
         self.possession_estimator = possession_estimator or BallPossessionEstimator()
@@ -134,6 +156,7 @@ class VideoAnalysisPipeline:
         self.shot_detector = shot_detector or ShotDetector()
         self.statistics_calculator = statistics_calculator or MatchStatisticsCalculator()
         self.video_renderer = video_renderer or VideoRenderer()
+        self._last_homography_coverage = 0.0
 
     def reset(self) -> None:
         """Clear every stateful component before another video."""
@@ -155,6 +178,9 @@ class VideoAnalysisPipeline:
         fps: float,
         maximum_frames: int | None = None,
         annotated_frame_callback: Callable[[Frame], None] | None = None,
+        reset_state: bool = True,
+        frame_id_offset: int = 0,
+        source_offset_seconds: float = 0.0,
     ) -> AnalysisResult:
         """Process an iterable of decoded frames; useful for video I/O and tests."""
         if fps <= 0:
@@ -162,7 +188,8 @@ class VideoAnalysisPipeline:
         self.possession_estimator.configure_for_fps(fps)
         if maximum_frames is not None and maximum_frames < 1:
             raise ValueError("maximum_frames must be positive")
-        self.reset()
+        if reset_state:
+            self.reset()
         detections: list[Detection] = []
         tracks: list[Track] = []
         keypoints: list[PitchKeypoint] = []
@@ -173,12 +200,14 @@ class VideoAnalysisPipeline:
         shots: list[ShotEvent] = []
         predictions: list[ExpectedGoalPrediction] = []
         frame_count = 0
+        reliable_frames = 0
 
-        for frame_id, frame in enumerate(frames):
-            if maximum_frames is not None and frame_id >= maximum_frames:
+        for local_frame_id, frame in enumerate(frames):
+            if maximum_frames is not None and local_frame_id >= maximum_frames:
                 break
+            frame_id = frame_id_offset + local_frame_id
             validate_frame(frame)
-            timestamp = frame_id / fps
+            timestamp = source_offset_seconds + local_frame_id / fps
             frame_detections = self.detector.detect(frame, frame_id=frame_id)
             frame_tracks = self.tracker.update(
                 [item for item in frame_detections if item.class_name.casefold() != "ball"],
@@ -188,6 +217,7 @@ class VideoAnalysisPipeline:
             assignments = self.team_classifier.classify(frame, frame_tracks)
             frame_keypoints = self.keypoint_detector.detect(frame, frame_id=frame_id)
             self._update_homography(frame_keypoints)
+            reliable_frames += int(self.homography.validate())
             projected_positions = self.position_estimator.project_tracks(
                 frame_tracks,
                 timestamp=timestamp,
@@ -257,7 +287,11 @@ class VideoAnalysisPipeline:
                 LOGGER.info("Processed %d frames", frame_count)
 
         if frame_count == 0:
-            raise VideoAnalysisError("Video contains no decodable frames")
+            raise VideoAnalysisError(
+                AnalysisErrorCode.VIDEO_UNREADABLE,
+                "Video contains no decodable frames",
+            )
+        self._last_homography_coverage = reliable_frames / frame_count
         final_assignments = self.identity_resolver.resolve_team_assignments(
             self.team_classifier.assignments
         )
@@ -293,6 +327,62 @@ class VideoAnalysisPipeline:
             identity_resolution=self.identity_resolver.summary(),
         )
 
+    def process_segment(
+        self,
+        frames: Iterable[Frame],
+        *,
+        fps: float,
+        segment_index: int,
+        source_offset_seconds: float,
+    ) -> WindowMetrics:
+        """Process a segment without resetting state and return window metrics."""
+        if segment_index < 0 or source_offset_seconds < 0:
+            raise ValueError("segment_index and source_offset_seconds must be non-negative")
+        frame_offset = round(source_offset_seconds * fps)
+        result = self.process_frames(
+            frames,
+            fps=fps,
+            reset_state=False,
+            frame_id_offset=frame_offset,
+            source_offset_seconds=source_offset_seconds,
+        )
+        speeds = [position.speed for position in result.positions if position.speed is not None]
+        possession_a = sum(
+            1 / fps
+            for observation in result.possessions
+            if observation.team_id is not None and observation.team_id.value == "TEAM_A"
+        )
+        possession_b = sum(
+            1 / fps
+            for observation in result.possessions
+            if observation.team_id is not None and observation.team_id.value == "TEAM_B"
+        )
+        distance = sum(speed / fps for speed in speeds)
+        return WindowMetrics(
+            segment_index=segment_index,
+            frames_processed=result.frame_count,
+            distance_m=distance,
+            possession_seconds_team_a=possession_a,
+            possession_seconds_team_b=possession_b,
+            passes=len(result.passes),
+            completed_passes=sum(event.completed for event in result.passes),
+            shots=len(result.shots),
+            xg=sum(prediction.xg for prediction in result.xg_predictions),
+            average_speed_mps=None if not speeds else sum(speeds) / len(speeds),
+            average_position_x=(
+                None
+                if not result.positions
+                else sum(position.x for position in result.positions) / len(result.positions)
+            ),
+            average_position_y=(
+                None
+                if not result.positions
+                else sum(position.y for position in result.positions) / len(result.positions)
+            ),
+            coverage=self._last_homography_coverage if result.frame_count else 0.0,
+            canonical_track_ids=tuple(sorted({position.track_id for position in result.positions})),
+        )
+
     def analyze_video(
         self,
         source: str | Path,
@@ -303,11 +393,17 @@ class VideoAnalysisPipeline:
         """Decode a video, stream it through the pipeline, and optionally write annotations."""
         source_path = Path(source)
         if not source_path.is_file():
-            raise VideoAnalysisError(f"Input video does not exist: {source_path}")
+            raise VideoAnalysisError(
+                AnalysisErrorCode.VIDEO_UNREADABLE,
+                f"Input video does not exist: {source_path}",
+            )
         capture = cv2.VideoCapture(str(source_path))
         if not capture.isOpened():
             capture.release()
-            raise VideoAnalysisError(f"Could not open input video: {source_path}")
+            raise VideoAnalysisError(
+                AnalysisErrorCode.VIDEO_UNREADABLE,
+                f"Could not open input video: {source_path}",
+            )
         fps = float(capture.get(cv2.CAP_PROP_FPS))
         if fps <= 0:
             fps = self.config.fallback_fps
@@ -322,7 +418,10 @@ class VideoAnalysisPipeline:
             if not writer.isOpened():
                 capture.release()
                 writer.release()
-                raise VideoAnalysisError(f"Could not open annotated video writer: {destination}")
+                raise VideoAnalysisError(
+                    AnalysisErrorCode.VIDEO_UNREADABLE,
+                    f"Could not open annotated video writer: {destination}",
+                )
 
         def decoded_frames() -> Iterable[Frame]:
             while True:
@@ -386,7 +485,10 @@ class VideoAnalysisPipeline:
         for name, image in images.items():
             destination = visualization_root / f"{name}.png"
             if not cv2.imwrite(str(destination), image):
-                raise VideoAnalysisError(f"Could not write visualization: {destination}")
+                raise VideoAnalysisError(
+                    AnalysisErrorCode.VIDEO_UNREADABLE,
+                    f"Could not write visualization: {destination}",
+                )
             visualizations[name] = destination
         player_root = visualization_root / "players"
         player_root.mkdir(parents=True, exist_ok=True)
@@ -394,7 +496,10 @@ class VideoAnalysisPipeline:
             destination = player_root / f"player_{player.player_id}_heatmap.png"
             image = heatmaps.render_positions(result.positions, player_id=player.player_id)
             if not cv2.imwrite(str(destination), image):
-                raise VideoAnalysisError(f"Could not write visualization: {destination}")
+                raise VideoAnalysisError(
+                    AnalysisErrorCode.VIDEO_UNREADABLE,
+                    f"Could not write visualization: {destination}",
+                )
             visualizations[f"player_{player.player_id}_heatmap"] = destination
         report = root / "report.json"
         report.parent.mkdir(parents=True, exist_ok=True)

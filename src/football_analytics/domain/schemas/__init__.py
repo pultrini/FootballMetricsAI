@@ -1,0 +1,43 @@
+"""Immutable domain records."""
+
+from football_analytics.domain.schemas.schemas import (
+    BallPosition,
+    Detection,
+    EventRecord,
+    ExpectedGoalPrediction,
+    HistoricalShot,
+    IdentityResolutionSummary,
+    MatchStatistics,
+    PassEvent,
+    PitchKeypoint,
+    PlayerPosition,
+    PlayerStatistics,
+    PossessionObservation,
+    PossessionSummary,
+    ShotEvent,
+    TeamId,
+    TeamStatistics,
+    Track,
+    XGAggregation,
+)
+
+__all__ = [
+    "BallPosition",
+    "Detection",
+    "EventRecord",
+    "ExpectedGoalPrediction",
+    "HistoricalShot",
+    "IdentityResolutionSummary",
+    "MatchStatistics",
+    "PassEvent",
+    "PitchKeypoint",
+    "PlayerPosition",
+    "PlayerStatistics",
+    "PossessionObservation",
+    "PossessionSummary",
+    "ShotEvent",
+    "TeamId",
+    "TeamStatistics",
+    "Track",
+    "XGAggregation",
+]
