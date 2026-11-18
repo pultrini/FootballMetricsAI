@@ -1,0 +1,167 @@
+{
+  "additionalProperties": false,
+  "description": "Metrics belonging to one processed segment.",
+  "properties": {
+    "average_position_x": {
+      "anyOf": [
+        {
+          "maximum": 105,
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Average Position X"
+    },
+    "average_position_y": {
+      "anyOf": [
+        {
+          "maximum": 68,
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Average Position Y"
+    },
+    "average_speed_mps": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Average Speed Mps"
+    },
+    "canonical_track_ids": {
+      "default": [],
+      "items": {
+        "type": "integer"
+      },
+      "title": "Canonical Track Ids",
+      "type": "array"
+    },
+    "compactness_m": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Compactness M"
+    },
+    "completed_passes": {
+      "minimum": 0,
+      "title": "Completed Passes",
+      "type": "integer"
+    },
+    "coverage": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Coverage",
+      "type": "number"
+    },
+    "defensive_line_x": {
+      "anyOf": [
+        {
+          "maximum": 105,
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Defensive Line X"
+    },
+    "distance_m": {
+      "minimum": 0,
+      "title": "Distance M",
+      "type": "number"
+    },
+    "field_tilt": {
+      "anyOf": [
+        {
+          "maximum": 100,
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Field Tilt"
+    },
+    "frames_processed": {
+      "minimum": 0,
+      "title": "Frames Processed",
+      "type": "integer"
+    },
+    "passes": {
+      "minimum": 0,
+      "title": "Passes",
+      "type": "integer"
+    },
+    "possession_seconds_team_a": {
+      "minimum": 0,
+      "title": "Possession Seconds Team A",
+      "type": "number"
+    },
+    "possession_seconds_team_b": {
+      "minimum": 0,
+      "title": "Possession Seconds Team B",
+      "type": "number"
+    },
+    "schema_version": {
+      "const": "1",
+      "default": "1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "segment_index": {
+      "minimum": 0,
+      "title": "Segment Index",
+      "type": "integer"
+    },
+    "shots": {
+      "minimum": 0,
+      "title": "Shots",
+      "type": "integer"
+    },
+    "xg": {
+      "minimum": 0,
+      "title": "Xg",
+      "type": "number"
+    }
+  },
+  "required": [
+    "segment_index",
+    "frames_processed",
+    "distance_m",
+    "possession_seconds_team_a",
+    "possession_seconds_team_b",
+    "passes",
+    "completed_passes",
+    "shots",
+    "xg",
+    "coverage"
+  ],
+  "title": "WindowMetrics",
+  "type": "object"
+}
