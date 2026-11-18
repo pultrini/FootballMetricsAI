@@ -32,10 +32,6 @@ def normalize_result(
     if value.shape != (3, 3):
         raise ValueError("matrix must have shape (3, 3)")
     result.update(
-        {
-            f"h{row}{column}": float(value[row, column])
-            for row in range(3)
-            for column in range(3)
-        }
+        {f"h{row}{column}": float(value[row, column]) for row in range(3) for column in range(3)}
     )
     return result

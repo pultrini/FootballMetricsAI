@@ -34,16 +34,14 @@ def export_error_frames(
     ranked = audit.dropna(subset=list(required - {"frame_id"})).copy()
     ranked["rank_jump"] = ranked["center_jump_m"].rank(ascending=False, method="min")
     ranked["rank_rmse"] = ranked["rmse_m"].rank(ascending=False, method="min")
-    ranked["rank_condition"] = ranked["condition_number"].rank(
-        ascending=False, method="min"
-    )
+    ranked["rank_condition"] = ranked["condition_number"].rank(ascending=False, method="min")
     ranked["rank_inlier"] = ranked["inlier_ratio"].rank(ascending=True, method="min")
     ranked["error_rank_score"] = ranked[
         ["rank_jump", "rank_rmse", "rank_condition", "rank_inlier"]
     ].mean(axis=1)
-    ranked = ranked.sort_values(
-        ["error_rank_score", "frame_id"], ascending=[True, True]
-    ).head(limit)
+    ranked = ranked.sort_values(["error_rank_score", "frame_id"], ascending=[True, True]).head(
+        limit
+    )
 
     output_dir.mkdir(parents=True, exist_ok=True)
     capture = cv2.VideoCapture(str(video_path))

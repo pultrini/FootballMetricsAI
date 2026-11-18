@@ -34,9 +34,13 @@ def walk(old, new, path: str, allow_extra_new: bool) -> None:
     elif isinstance(old, list) and isinstance(new, list):
         if len(old) != len(new):
             errors.append(f"{path}: tamanho {len(old)} != {len(new)}")
-        for index, (a, b) in enumerate(zip(old, new)):
+        for index, (a, b) in enumerate(zip(old, new, strict=False)):
             walk(a, b, f"{path}[{index}]", allow_extra_new)
-    elif isinstance(old, (int, float)) and isinstance(new, (int, float)) and not isinstance(old, bool):
+    elif (
+        isinstance(old, (int, float))
+        and isinstance(new, (int, float))
+        and not isinstance(old, bool)
+    ):
         if not math.isclose(old, new, rel_tol=1e-9, abs_tol=1e-12):
             errors.append(f"{path}: {old} != {new}")
     elif old != new:
@@ -51,13 +55,17 @@ def compare_parquet(old_file: Path, new_file: Path, allow_extra_new: bool) -> No
     if only_old:
         errors.append(f"{name}: colunas só no ANTIGO: {sorted(only_old)}")
     if only_new:
-        (notes if allow_extra_new else errors).append(f"{name}: colunas só no NOVO: {sorted(only_new)}")
+        (notes if allow_extra_new else errors).append(
+            f"{name}: colunas só no NOVO: {sorted(only_new)}"
+        )
     common = [c for c in old_df.columns if c in new_df.columns]
     if old_df.height != new_df.height:
         errors.append(f"{name}: linhas {old_df.height} != {new_df.height}")
         return
     try:
-        assert_frame_equal(old_df.select(common), new_df.select(common), check_exact=False, rtol=1e-9)
+        assert_frame_equal(
+            old_df.select(common), new_df.select(common), check_exact=False, rtol=1e-9
+        )
     except AssertionError as exc:
         errors.append(f"{name}: valores diferentes -> {str(exc).splitlines()[0]}")
 
