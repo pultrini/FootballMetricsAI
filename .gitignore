@@ -9,11 +9,14 @@ htmlcov/
 data/*.csv
 data/*.json
 data/*.parquet
-models/*
 !data/.gitkeep
 !models/.gitkeep
 notebooks/homography
 data/
-outputs/
+
 
 *.ipynb
+notebooks/homography/*.ipynb
+notebooks/homography/cache/
+notebooks/homography/results/
+notebooks/homography/audit_baseline/
